@@ -1,15 +1,17 @@
 from flask import Flask, request, jsonify, render_template
-import tensorflow as tf
 import numpy as np
 from PIL import Image
 import io
 import base64
 
 # ------------------------------
-# Load model
+# Model will be loaded lazily inside the predict endpoint. This
+# allows the Flask app to start even when TensorFlow is not yet
+# installed. A helpful error is returned if model import fails.
 # ------------------------------
 MODEL_PATH = "black_pepper_model.h5"   # your trained model path
-model = tf.keras.models.load_model(MODEL_PATH)
+model = None
+tf = None
 
 # Classes must match your training dataset folders
 CLASS_NAMES = ["black_pepper_healthy", "black_pepper_leaf_blight", "black_pepper_yellow_mottle_virus"]
@@ -53,6 +55,17 @@ def predict():
         img = img.resize(IMG_SIZE)           # only width & height
         arr = np.array(img) / 255.0          # normalize
         arr = np.expand_dims(arr, axis=0)    # add batch dimension: (1, 224, 224, 3)
+
+        # ---------------- Load model (lazy) & Predict ----------------
+        global model, tf
+        if model is None:
+            try:
+                import importlib
+                _tf = importlib.import_module('tensorflow')
+                tf = _tf
+                model = tf.keras.models.load_model(MODEL_PATH)
+            except Exception as e:
+                return jsonify({"error": f"Failed to load model: {e}. Install tensorflow and ensure MODEL_PATH exists."}), 500
 
         # ---------------- Predict ----------------
         preds = model.predict(arr)

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediction Result</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: "Poppins", sans-serif;
+            background: linear-gradient(135deg, #15aabf, #4c6ef5);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .result-box {
+            background: #ffffffee;
+            padding: 40px;
+            width: 450px;
+            text-align: center;
+            color: #222;
+            border-radius: 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            animation: fadeIn 0.8s ease-in-out;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+            color: #1c1c1c;
+            font-size: 28px;
+        }
+
+        .prediction {
+            font-size: 26px;
+            font-weight: bold;
+            color: #0b7285;
+            margin-bottom: 25px;
+        }
+
+        a button {
+            padding: 12px 20px;
+            background: #4c6ef5;
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        a button:hover {
+            background: #364fc7;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="result-box">
+    <h2>Recommended Crop</h2>
+
+    <div class="prediction">
+        {{ prediction }}
+    </div>
+
+    <a href="/">
+        <button>Predict Again</button>
+    </a>
+</div>
+
+</body>
+</html>

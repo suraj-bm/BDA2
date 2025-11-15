@@ -1,0 +1,5 @@
+flask>=2.0
+tensorflow>=2.11
+pillow
+numpy
+requests

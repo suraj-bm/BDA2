@@ -1,159 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Black Pepper Disease Detection</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body {
-      background: #f9f9f9;
-    }
-    .navbar {
-      background-color: #2c6e49;
-    }
-    .navbar-brand, .nav-link {
-      color: #fff !important;
-    }
-    .container {
-      margin-top: 40px;
-    }
-    video, canvas, img {
-      max-width: 100%;
-      border-radius: 10px;
-      margin: 10px 0;
-    }
-    #resultCard {
-      display: none;
-      margin-top: 20px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pepper Disease Classifier</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: "Poppins", sans-serif;
+            background: linear-gradient(135deg, #4c6ef5, #15aabf);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: #ffffffee;
+            padding: 24px;
+            border-radius: 16px;
+            width: 420px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+        }
+
+        h2 { text-align: center; margin-bottom: 8px; color: #111; }
+        p.lead { text-align:center; color:#333; margin-top:0; margin-bottom:18px; }
+
+        label { font-weight:600; display:block; margin:8px 0 6px; }
+
+        input[type="file"] { width:100%; }
+
+        .preview {
+            width:100%; height:240px; border-radius:8px; background:#f5f7fb; display:flex; align-items:center; justify-content:center; overflow:hidden; margin:12px 0;
+        }
+        .preview img { max-width:100%; max-height:100%; }
+
+        button {
+            width:100%; padding:12px; background:#4c6ef5; border:none; border-radius:10px; color:#fff; font-weight:700; cursor:pointer;
+        }
+
+        .result { margin-top:12px; padding:10px; background:#f7f9fc; border-radius:8px; font-weight:600; text-align:center; }
+
+        .error { color:#b00020; font-weight:700; }
+    </style>
 </head>
 <body>
-  <!-- Navbar -->
-  <nav class="navbar navbar-expand-lg">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="#">Black Pepper Disease Detection</a>
-      <div class="collapse navbar-collapse">
-        <ul class="navbar-nav ms-auto">
-          <li class="nav-item"><a class="nav-link" href="#capture">Capture</a></li>
-          <li class="nav-item"><a class="nav-link" href="#upload">Upload</a></li>
-        </ul>
-      </div>
-    </div>
-  </nav>
 
-  <!-- Main Content -->
-  <div class="container">
-    <div class="row">
-      <!-- Capture Section -->
-      <div class="col-md-6" id="capture">
-        <h3>📸 Capture from Camera</h3>
-        <video id="camera" autoplay playsinline></video>
-        <canvas id="canvas" style="display:none;"></canvas>
-        <img id="capturedImg" class="img-fluid" src="" alt="Captured Image">
-        <button class="btn btn-success mt-2" onclick="capturePhoto()">Capture</button>
-        <button class="btn btn-primary mt-2" onclick="sendCaptured()">Detect Disease</button>
-      </div>
+<div class="container">
+    <h2>Pepper Disease Classifier</h2>
+    <p class="lead">Upload a leaf image to diagnose disease.</p>
 
-      <!-- Upload Section -->
-      <div class="col-md-6" id="upload">
-        <h3>📤 Upload an Image</h3>
-        <form id="uploadForm">
-          <input type="file" id="uploadInput" class="form-control mb-3" accept="image/*" required>
-          <button type="submit" class="btn btn-primary">Detect Disease</button>
-        </form>
-      </div>
-    </div>
+    <form id="predict-form" enctype="multipart/form-data">
+        <label for="file">Select image</label>
+        <input id="file-input" type="file" name="file" accept="image/*" required>
 
-    <!-- Result -->
-    <div id="resultCard" class="card text-center shadow">
-      <div class="card-body">
-        <h4 class="card-title">🔍 Detection Result</h4>
-        <p id="resultText" class="card-text"></p>
-      </div>
-    </div>
-  </div>
+        <div class="preview" id="preview">No image selected</div>
 
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+        <button id="predict-btn" type="submit">Predict</button>
+    </form>
 
-  <!-- Camera + Prediction Script -->
-  <script>
-    const video = document.getElementById('camera');
-    const canvas = document.getElementById('canvas');
-    const capturedImg = document.getElementById('capturedImg');
-    const resultCard = document.getElementById('resultCard');
-    const resultText = document.getElementById('resultText');
+    <div id="output" class="result" style="display:none"></div>
+    <div id="err" class="error" style="display:none"></div>
+</div>
 
-    // Start camera
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        video.srcObject = stream;
-      } catch (err) {
-        alert("Error accessing camera: " + err);
-      }
-    }
+<script>
+document.getElementById('file-input').addEventListener('change', function(ev){
+    const p = document.getElementById('preview');
+    p.innerHTML = '';
+    const f = ev.target.files[0];
+    if(!f){ p.textContent = 'No image selected'; return; }
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(f);
+    img.onload = () => URL.revokeObjectURL(img.src);
+    p.appendChild(img);
+});
 
-    // Capture photo
-    function capturePhoto() {
-      const context = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/png');
-      capturedImg.src = dataUrl;
-    }
+document.getElementById('predict-form').addEventListener('submit', async function(e){
+    e.preventDefault();
+    document.getElementById('output').style.display='none';
+    document.getElementById('err').style.display='none';
 
-    // Send captured image to Flask
-    async function sendCaptured() {
-      if (!capturedImg.src) {
-        alert("Please capture an image first.");
+    const input = document.getElementById('file-input');
+    if(!input.files || input.files.length===0){
+        document.getElementById('err').textContent = 'Please select an image file.';
+        document.getElementById('err').style.display='block';
         return;
-      }
-
-      const response = await fetch("/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: capturedImg.src })
-      });
-
-      const result = await response.json();
-      displayResult(result);
     }
 
-    // Upload form handler
-    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const fileInput = document.getElementById('uploadInput');
-      const file = fileInput.files[0];
-      if (!file) return;
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
 
-      const formData = new FormData();
-      formData.append("file", file);
+    try{
+        const btn = document.getElementById('predict-btn');
+        btn.disabled = true;
+        btn.textContent = 'Predicting...';
 
-      const response = await fetch("/predict", {
-        method: "POST",
-        body: formData
-      });
+        const res = await fetch('/predict', { method:'POST', body: formData });
+        const data = await res.json();
+        btn.disabled = false;
+        btn.textContent = 'Predict';
 
-      const result = await response.json();
-      displayResult(result);
-    });
+        if(!res.ok){
+            document.getElementById('err').textContent = data.error || 'Prediction failed';
+            document.getElementById('err').style.display='block';
+            return;
+        }
 
-    // Show result
-    function displayResult(result) {
-      if (result.error) {
-        resultText.textContent = "⚠️ Error: " + result.error;
-      } else {
-        resultText.innerHTML = `Class: <b>${result.class}</b><br>Confidence: <b>${(result.confidence * 100).toFixed(2)}%</b>`;
-      }
-      resultCard.style.display = "block";
+        document.getElementById('output').textContent = `${data.class} (confidence: ${data.confidence})`;
+        document.getElementById('output').style.display='block';
+    }catch(err){
+        document.getElementById('err').textContent = err.message || String(err);
+        document.getElementById('err').style.display='block';
+        document.getElementById('predict-btn').disabled = false;
+        document.getElementById('predict-btn').textContent = 'Predict';
     }
+});
+</script>
 
-    startCamera();
-  </script>
 </body>
 </html>
