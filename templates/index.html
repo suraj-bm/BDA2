@@ -2,119 +2,145 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pepper Disease Classifier</title>
+    <title>Leaf Disease Detection</title>
+
+    <!-- Bootstrap 5 -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
     <style>
         body {
-            margin: 0;
-            font-family: "Poppins", sans-serif;
-            background: linear-gradient(135deg, #4c6ef5, #15aabf);
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            background: #f7f7f7;
         }
-
-        .container {
-            background: #ffffffee;
-            padding: 24px;
-            border-radius: 16px;
-            width: 420px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+        .preview-img {
+            width: 100%;
+            margin-top: 15px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
         }
-
-        h2 { text-align: center; margin-bottom: 8px; color: #111; }
-        p.lead { text-align:center; color:#333; margin-top:0; margin-bottom:18px; }
-
-        label { font-weight:600; display:block; margin:8px 0 6px; }
-
-        input[type="file"] { width:100%; }
-
-        .preview {
-            width:100%; height:240px; border-radius:8px; background:#f5f7fb; display:flex; align-items:center; justify-content:center; overflow:hidden; margin:12px 0;
+        #cameraPreview {
+            width: 100%;
+            border-radius: 10px;
+            display: none;
         }
-        .preview img { max-width:100%; max-height:100%; }
-
-        button {
-            width:100%; padding:12px; background:#4c6ef5; border:none; border-radius:10px; color:#fff; font-weight:700; cursor:pointer;
-        }
-
-        .result { margin-top:12px; padding:10px; background:#f7f9fc; border-radius:8px; font-weight:600; text-align:center; }
-
-        .error { color:#b00020; font-weight:700; }
     </style>
 </head>
+
 <body>
 
-<div class="container">
-    <h2>Pepper Disease Classifier</h2>
-    <p class="lead">Upload a leaf image to diagnose disease.</p>
+<div class="container py-5">
+    <div class="card shadow-lg mx-auto" style="max-width: 600px;">
+        <div class="card-body text-center">
+            <h3 class="card-title mb-3">Pepper Leaf Disease Detector</h3>
+            <p class="text-muted">Upload a leaf image or capture using your camera</p>
 
-    <form id="predict-form" enctype="multipart/form-data">
-        <label for="file">Select image</label>
-        <input id="file-input" type="file" name="file" accept="image/*" required>
+            <!-- Image Upload Form -->
+            <form id="uploadForm" action="/predict" method="POST" enctype="multipart/form-data">
 
-        <div class="preview" id="preview">No image selected</div>
+                <!-- File input -->
+                <div class="mb-3">
+                    <input class="form-control" type="file" name="image" id="fileInput" accept="image/*">
+                </div>
 
-        <button id="predict-btn" type="submit">Predict</button>
-    </form>
+                <!-- Camera Button -->
+                <button type="button" id="cameraButton" class="btn btn-primary mb-3">
+                    <i class="bi bi-camera"></i> Use Camera
+                </button>
 
-    <div id="output" class="result" style="display:none"></div>
-    <div id="err" class="error" style="display:none"></div>
+                <!-- Camera Preview -->
+                <video id="cameraPreview" autoplay></video>
+
+                <!-- Submit button -->
+                <button type="submit" class="btn btn-success mt-3 w-100">
+                    Detect Disease
+                </button>
+            </form>
+
+            <!-- Show preview & results -->
+            {% if result_image %}
+                <hr class="my-4">
+
+                <h5>Detected Image:</h5>
+                <img src="{{ result_image }}" class="preview-img">
+
+                <h5 class="mt-4">Detections:</h5>
+                <ul class="list-group">
+                    {% for d in detections %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ d.class }}</span>
+                            <span>{{ d.confidence * 100 }}%</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+
+                {% if class_counts %}
+                    <h5 class="mt-4">Summary:</h5>
+                    <ul class="list-group">
+                        {% for cls, count in class_counts.items() %}
+                            <li class="list-group-item d-flex justify-content-between">
+                                <strong>{{ cls }}</strong>
+                                <span>{{ count }} leaves</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
 </div>
 
+<!-- Bootstrap JS + Icons -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
+
+<!-- Camera Script -->
 <script>
-document.getElementById('file-input').addEventListener('change', function(ev){
-    const p = document.getElementById('preview');
-    p.innerHTML = '';
-    const f = ev.target.files[0];
-    if(!f){ p.textContent = 'No image selected'; return; }
-    const img = document.createElement('img');
-    img.src = URL.createObjectURL(f);
-    img.onload = () => URL.revokeObjectURL(img.src);
-    p.appendChild(img);
-});
+    const cameraButton = document.getElementById("cameraButton");
+    const cameraPreview = document.getElementById("cameraPreview");
+    const fileInput = document.getElementById("fileInput");
 
-document.getElementById('predict-form').addEventListener('submit', async function(e){
-    e.preventDefault();
-    document.getElementById('output').style.display='none';
-    document.getElementById('err').style.display='none';
+    let cameraStream = null;
 
-    const input = document.getElementById('file-input');
-    if(!input.files || input.files.length===0){
-        document.getElementById('err').textContent = 'Please select an image file.';
-        document.getElementById('err').style.display='block';
-        return;
-    }
+    cameraButton.addEventListener("click", async () => {
+        if (cameraStream === null) {
+            // open camera
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                cameraPreview.srcObject = cameraStream;
+                cameraPreview.style.display = "block";
+                cameraButton.textContent = "Capture Photo";
+            } catch (err) {
+                alert("Camera access denied!");
+            }
+        } else {
+            // capture photo
+            const canvas = document.createElement("canvas");
+            canvas.width = cameraPreview.videoWidth;
+            canvas.height = cameraPreview.videoHeight;
 
-    const formData = new FormData();
-    formData.append('file', input.files[0]);
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
 
-    try{
-        const btn = document.getElementById('predict-btn');
-        btn.disabled = true;
-        btn.textContent = 'Predicting...';
+            canvas.toBlob((blob) => {
+                const file = new File([blob], "camera.jpg", { type: "image/jpeg" });
 
-        const res = await fetch('/predict', { method:'POST', body: formData });
-        const data = await res.json();
-        btn.disabled = false;
-        btn.textContent = 'Predict';
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                fileInput.files = dt.files;
 
-        if(!res.ok){
-            document.getElementById('err').textContent = data.error || 'Prediction failed';
-            document.getElementById('err').style.display='block';
-            return;
+                // stop camera
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+
+                cameraPreview.style.display = "none";
+                cameraButton.textContent = "Use Camera";
+
+                alert("Photo captured! Now click DETECT.");
+            });
         }
-
-        document.getElementById('output').textContent = `${data.class} (confidence: ${data.confidence})`;
-        document.getElementById('output').style.display='block';
-    }catch(err){
-        document.getElementById('err').textContent = err.message || String(err);
-        document.getElementById('err').style.display='block';
-        document.getElementById('predict-btn').disabled = false;
-        document.getElementById('predict-btn').textContent = 'Predict';
-    }
-});
+    });
 </script>
 
 </body>
